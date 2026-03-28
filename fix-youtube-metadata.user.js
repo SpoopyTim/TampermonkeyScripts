@@ -7,6 +7,7 @@
 // @match        https://www.youtube.com/*
 // @grant        none
 // @run-at       document-idle
+// @license      MIT
 // @homepageURL  https://github.com/spoopytim/TampermonkeyScripts
 // @supportURL   https://github.com/spoopytim/TampermonkeyScripts/issues
 // @downloadURL  https://raw.githubusercontent.com/spoopytim/TampermonkeyScripts/main/fix-youtube-metadata.user.js
