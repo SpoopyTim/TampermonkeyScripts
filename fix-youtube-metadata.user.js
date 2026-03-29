@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-29.2
+// @version      2026-03-29.3
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -134,7 +134,7 @@
         document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer')
             .forEach(fixItem);
 
-        document.querySelectorAll('ytd-grid-video-renderer')
+        document.querySelectorAll('#metadata')
             .forEach(fixGridItem);
     }
 
