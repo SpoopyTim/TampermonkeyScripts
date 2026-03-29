@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-29.1
+// @version      2026-03-29.2
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -45,6 +45,47 @@
         return el;
     }
 
+    function fixTime(timeContent) {
+        const map = {
+            'sec': 'second',
+            'min': 'minute',
+            'hr': 'hour',
+            'wk': 'week',
+            'mo': 'month',
+            'yr': 'year'
+        };
+        const text = timeContent
+            .replace(/\b(sec|min|hr|wk|mo|yr)\b/g, (m) => map[m] || m)
+            .replace(/(\d+)\s(second|minute|hour|week|month|year)\b/g, (match, num, unit) => {
+                return `${num} ${unit}${num === "1" ? "" : "s"}`;
+            });
+        return text
+    }
+
+    function fixGridItem(item) {
+        const line = item.querySelector('#metadata-line');
+        if (!line || line.dataset.fixed) return;
+
+        const spans = line.querySelectorAll('span');
+        if (spans.length < 2) return;
+
+        const viewsEl = spans[0];
+        const timeEl = spans[1];
+
+        if (!viewsEl || !timeEl) return;
+
+        line.dataset.fixed = "true";
+        line.marginTop = "2px";
+        line.fontSize = "14px";
+
+        // Fix "views"
+        if (!viewsEl.textContent.includes('view')) {
+            viewsEl.textContent = `${viewsEl.textContent} views`;
+        }
+
+        timeEl.textContent = fixTime(timeEl.textContent);
+    }
+
     function fixItem(item) {
         const meta = item.querySelector('yt-content-metadata-view-model');
         if (!meta) return;
@@ -85,17 +126,30 @@
         hideJunk(meta);
 
         meta.appendChild(
-            createLine(`${viewsEl.textContent} views • ${timeEl.textContent}`)
+            createLine(`${viewsEl.textContent} views • ${fixTime(timeEl.textContent)}`)
         );
     }
 
     function scan() {
         document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer')
             .forEach(fixItem);
+
+        document.querySelectorAll('ytd-grid-video-renderer')
+            .forEach(fixGridItem);
     }
 
+    function injectStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            /* Fix video grid title and metadata spacing */
+            ytd-grid-video-renderer h3.ytd-grid-video-renderer {
+                margin: 8px 0 2px !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
     const observer = new MutationObserver(scan);
     observer.observe(document.body, { childList: true, subtree: true });
-
+    injectStyles();
     scan();
 })();
