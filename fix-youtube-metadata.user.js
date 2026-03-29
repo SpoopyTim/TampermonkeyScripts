@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-28
+// @version      2026-03-29
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
 // @match        https://www.youtube.com/*
