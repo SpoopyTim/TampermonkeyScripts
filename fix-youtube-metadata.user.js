@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-30.1
+// @version      2026-03-30.2
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -84,49 +84,45 @@
     function fixItem(item) {
         const meta = item.querySelector('yt-content-metadata-view-model');
         if (!meta) return;
+        if (meta.dataset.fixed) return;
 
         const texts = meta.querySelectorAll('.yt-content-metadata-view-model__metadata-text');
         if (texts.length < 2) return;
 
+        meta.dataset.fixed = "true";
         applyLayout(meta);
 
-        // Livestream / "watching" case
+        // Handle livestream / "watching" case (only 2 items)
         if (texts.length === 2) {
-            const channelEl = texts[0], watchingEl = texts[1];
+            const channelEl = texts[0];
+            const watchingEl = texts[1];
             if (!channelEl || !watchingEl) return;
 
             hideJunk(meta, true);
 
-            let customLine = meta.querySelector('.spoofed-metadata-line');
-            if (!customLine) {
-                customLine = createLine(watchingEl.textContent, { className: 'spoofed-metadata-line' });
-                meta.appendChild(customLine);
-            } else if (customLine.textContent !== watchingEl.textContent) {
-                customLine.textContent = watchingEl.textContent;
-            }
-
+            // Move "watching" to new line
             watchingEl.style.display = 'none';
+            meta.appendChild(createLine(watchingEl.textContent));
+
             return;
         }
 
         if (texts.length < 3) return;
-        const channelEl = texts[0], viewsEl = texts[1], timeEl = texts[2];
+
+        const channelEl = texts[0];
+        const viewsEl = texts[1];
+        const timeEl = texts[2];
         if (!channelEl || !viewsEl || !timeEl) return;
+
+        // Blow up old stuff
+        viewsEl.style.display = 'none';
+        timeEl.style.display = 'none';
 
         hideJunk(meta);
 
-        const formatted = formatViewsAndTime(viewsEl, timeEl);
-
-        let customLine = meta.querySelector('.spoofed-metadata-line');
-        if (!customLine) {
-            customLine = createLine(formatted, { className: 'spoofed-metadata-line' });
-            meta.appendChild(customLine);
-        } else if (customLine.textContent !== formatted) {
-            customLine.textContent = formatted;
-        }
-
-        viewsEl.style.display = 'none';
-        timeEl.style.display = 'none';
+        meta.appendChild(
+            createLine(`${viewsEl.textContent} views • ${fixTime(timeEl.textContent)}`)
+        );
     }
 
     function scan() {
