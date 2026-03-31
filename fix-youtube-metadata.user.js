@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-30.2
+// @version      2026-03-31.1
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
 // @match        https://www.youtube.com/*
-// @grant        none
+// @grant        GM_addStyle
 // @run-at       document-idle
 // @homepageURL  https://github.com/spoopytim/TampermonkeyScripts
 // @supportURL   https://github.com/spoopytim/TampermonkeyScripts/issues
@@ -17,128 +17,155 @@
 (function () {
     'use strict';
 
-    function applyLayout(meta) {
-        meta.style.display = "flex";
-        meta.style.flexDirection = "column";
-        meta.style.alignItems = "flex-start";
-    }
-
     function hideJunk(meta, includeIcon = false) {
         let selector = '.yt-content-metadata-view-model__delimiter, .yt-content-metadata-view-model__leading-icon';
         if (includeIcon) selector += ', .yt-content-metadata-view-model__icon';
-        meta.querySelectorAll(selector).forEach(el => el.style.display = 'none');
+
+        meta.querySelectorAll(selector)
+            .forEach(el => el.style.display = 'none');
     }
 
     function createLine(text, options = {}) {
         const el = document.createElement('div');
         el.textContent = text;
-        el.style.fontSize = options.fontSize || "14px";
-        el.style.color = options.color || "#aaa";
-        el.style.marginTop = options.marginTop || "2px";
-        if (options.className) el.className = options.className;
+
+        el.className = options.className || 'spoofed-metadata-line';
+
         return el;
     }
 
     function fixTime(timeContent) {
-        const map = { sec: 'second', min: 'minute', hr: 'hour', wk: 'week', mo: 'month', yr: 'year' };
+        const map = {
+            sec: 'second',
+            min: 'minute',
+            hr: 'hour',
+            wk: 'week',
+            mo: 'month',
+            yr: 'year'
+        };
+
         return timeContent
             .replace(/\b(sec|min|hr|wk|mo|yr)\b/g, m => map[m] || m)
-            .replace(/(\d+)\s(second|minute|hour|week|month|year)\b/g, (m, num, unit) => `${num} ${unit}${num === "1" ? "" : "s"}`);
+            .replace(/(\d+)\s(second|minute|hour|week|month|year)\b/g,
+                (m, num, unit) => `${num} ${unit}${num === "1" ? "" : "s"}`);
     }
 
     function formatViewsAndTime(viewsEl, timeEl) {
         let viewsText = viewsEl.textContent;
-        if (!viewsText.includes('view')) viewsText = `${viewsText} views`;
+
+        if (!viewsText.includes('view')) {
+            viewsText = `${viewsText} views`;
+        }
+
         return `${viewsText} • ${fixTime(timeEl.textContent)}`;
     }
 
-    function fixGridItem(item) {
-        const meta = item.querySelector('#metadata');
-        const line = item.querySelector('#metadata-line');
-        if (!meta || !line) return;
+    function fixUniversal(item) {
+        const meta =
+            item.querySelector('#metadata') ||
+            item.querySelector('yt-content-metadata-view-model');
 
-        const spans = line.querySelectorAll('span');
-        if (spans.length < 2) return;
-        const viewsEl = spans[0], timeEl = spans[1];
-        if (!viewsEl || !timeEl) return;
-
-        hideJunk(meta);
-
-        const formatted = formatViewsAndTime(viewsEl, timeEl);
-
-        // Find or create the custom line
-        let customLine = meta.querySelector('.spoofed-metadata-line');
-        if (!customLine) {
-            customLine = createLine(formatted, { className: 'spoofed-metadata-line' });
-            meta.appendChild(customLine);
-        } else if (customLine.textContent !== formatted) {
-            // update if changed
-            customLine.textContent = formatted;
-        }
-
-        // Hide original
-        viewsEl.style.display = 'none';
-        timeEl.style.display = 'none';
-    }
-
-    function fixItem(item) {
-        const meta = item.querySelector('yt-content-metadata-view-model');
         if (!meta) return;
-        if (meta.dataset.fixed) return;
 
-        const texts = meta.querySelectorAll('.yt-content-metadata-view-model__metadata-text');
-        if (texts.length < 2) return;
+        const line = meta.querySelector('#metadata-line');
+        if (line) {
+            const spans = [...line.querySelectorAll('.inline-metadata-item, span')]
+                .filter(el => el.textContent.trim());
 
-        meta.dataset.fixed = "true";
-        applyLayout(meta);
+            if (spans.length >= 2) {
+                const viewsEl = spans[0];
+                const timeEl = spans[1];
 
-        // Handle livestream / "watching" case (only 2 items)
-        if (texts.length === 2) {
-            const channelEl = texts[0];
-            const watchingEl = texts[1];
-            if (!channelEl || !watchingEl) return;
+                hideJunk(meta);
 
-            hideJunk(meta, true);
+                const formatted = formatViewsAndTime(viewsEl, timeEl);
 
-            // Move "watching" to new line
-            watchingEl.style.display = 'none';
-            meta.appendChild(createLine(watchingEl.textContent));
+                let customLine = meta.querySelector('.spoofed-metadata-line');
+                if (!customLine) {
+                    customLine = createLine(formatted, {
+                        className: 'spoofed-metadata-line'
+                    });
+                    meta.appendChild(customLine);
+                } else if (customLine.textContent !== formatted) {
+                    customLine.textContent = formatted;
+                }
+
+                viewsEl.style.display = 'none';
+                timeEl.style.display = 'none';
+            }
 
             return;
         }
 
-        if (texts.length < 3) return;
+        // yt-content-metadata-view-model (home feed etc.)
+        const texts = meta.querySelectorAll('.yt-content-metadata-view-model__metadata-text');
+        if (texts.length < 2) return;
 
-        const channelEl = texts[0];
-        const viewsEl = texts[1];
-        const timeEl = texts[2];
-        if (!channelEl || !viewsEl || !timeEl) return;
+        // Livestream case (channel + watching)
+        if (texts.length === 2) {
+            const watchingEl = texts[1];
+            if (!watchingEl) return;
 
-        // Blow up old stuff
-        viewsEl.style.display = 'none';
-        timeEl.style.display = 'none';
+            hideJunk(meta, true);
 
-        hideJunk(meta);
+            let customLine = meta.querySelector('.spoofed-metadata-line');
+            if (!customLine) {
+                customLine = createLine(watchingEl.textContent, {
+                    className: 'spoofed-metadata-line'
+                });
+                meta.appendChild(customLine);
+            } else if (customLine.textContent !== watchingEl.textContent) {
+                customLine.textContent = watchingEl.textContent;
+            }
 
-        meta.appendChild(
-            createLine(`${viewsEl.textContent} views • ${fixTime(timeEl.textContent)}`)
-        );
+            watchingEl.style.display = 'none';
+            return;
+        }
+
+        // Normal case (channel, views, time)
+        if (texts.length >= 3) {
+            const viewsEl = texts[1];
+            const timeEl = texts[2];
+
+            if (!viewsEl || !timeEl) return;
+
+            hideJunk(meta);
+
+            const formatted = formatViewsAndTime(viewsEl, timeEl);
+
+            let customLine = meta.querySelector('.spoofed-metadata-line');
+            if (!customLine) {
+                customLine = createLine(formatted, {
+                    className: 'spoofed-metadata-line'
+                });
+                meta.appendChild(customLine);
+            } else if (customLine.textContent !== formatted) {
+                customLine.textContent = formatted;
+            }
+
+            viewsEl.style.display = 'none';
+            timeEl.style.display = 'none';
+        }
     }
 
     function scan() {
-        document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer').forEach(fixItem);
-        document.querySelectorAll('ytd-grid-video-renderer, ytd-rich-grid-media').forEach(fixGridItem);
+        document.querySelectorAll(
+            'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-rich-grid-media'
+        ).forEach(fixUniversal);
     }
 
-    // Fix the large gap from the expected smaller font size
     function injectStyles() {
-        const style = document.createElement('style');
-        style.textContent = `
+        GM_addStyle(`
             ytd-grid-video-renderer h3.ytd-grid-video-renderer {
                 margin: 8px 0 2px !important;
             }
-        `;
-        document.head.appendChild(style);
+
+            .spoofed-metadata-line {
+                font-size: 14px;
+                color: #aaa;
+                margin-top: 2px;
+            }
+        `);
     }
 
     const observer = new MutationObserver(scan);
