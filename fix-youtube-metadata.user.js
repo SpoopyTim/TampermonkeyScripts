@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-04-04.1
+// @version      2026-04-04.2
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -60,7 +60,7 @@
         return `${viewsText} • ${fixTime(timeEl.textContent)}`;
     }
 
-    function handleHomepageMetadata(meta, spans) {
+    function handleRecommendationsMetadata(meta, spans) {
         // Case A: livestream (channel name + viewers)
         if (spans.length === 2) {
             const watchingEl = spans[1];
@@ -131,14 +131,30 @@
         }
     }
 
-    function handleHomepage(meta) {
-        const inner = meta.querySelector(".ytContentMetadataViewModelMetadataRow");
-        if (!inner) return;
+    function handleRecommendations(meta) {
+        const rowContainers = meta.querySelectorAll(".ytContentMetadataViewModelMetadataRow");
+        if (!rowContainers) return;
+        // In sidebar recommendations, the inner we want is the second row
+        let inner
+        // >= 2 because it might have NEW under it which is another row.
+        // If this is the case then 0 = channel name, 1 = views and time, 2 = NEW
+        let isSidenavVideos = (rowContainers.length >= 2); 
+        if (isSidenavVideos) {
+            inner = rowContainers[1]
+        } else {
+            inner = rowContainers[0]
+        }
         const homepageSpans = [...inner.querySelectorAll('span.yt-core-attributed-string')]
         .filter(el => el.textContent.trim());
 
+        if (isSidenavVideos) {
+            // Fix the font sizing of the channel name, could probably move this to GM_addStyle later
+            rowContainers[0].querySelectorAll('span.yt-core-attributed-string')[0].style.fontSize = "14px";
+            return handleNormalMetadata(inner, homepageSpans);
+        }
+
         if (homepageSpans.length >= 2 && !homepageSpans[1]?.textContent?.includes('waiting')) {
-            return handleHomepageMetadata(meta, homepageSpans);
+            return handleRecommendationsMetadata(meta, homepageSpans);
         } else {
             return handleLivestreamMetadata(meta, homepageSpans[1]);
         }
@@ -149,11 +165,6 @@
         if (!inner) return;
         const channelSpans = [...inner.querySelectorAll('span.ytd-grid-video-renderer, span.inline-metadata-item')]
         .filter(el => el.textContent.trim());
-
-        // This looks redundant, i think its already covered
-        // if (channelSpans.length === 2) {
-        //     return handleLivestreamMetadata(inner, channelSpans[1]);
-        // }
 
         if (channelSpans.length === 2) {
             return handleNormalMetadata(inner, channelSpans);
@@ -176,7 +187,8 @@
 
     function scan() {
         // The element selected here determines where the spoofed line gets added by updateCustomLine(). This is for the homepage only because jank
-        document.querySelectorAll('.yt-lockup-metadata-view-model__metadata').forEach(handleHomepage);
+        // This selector applies to both the homepage and the recommendations on the right side of videos
+        document.querySelectorAll('.yt-lockup-metadata-view-model__metadata').forEach(handleRecommendations);
         // ytd-grid-video-renderer is for the channel homepage, ytd-video-meta-block is for the channel videos page, yeah idfk why it's different either
         document.querySelectorAll('ytd-grid-video-renderer, ytd-video-meta-block').forEach(handleChannel);
         document.querySelectorAll('ytd-video-meta-block.style-scope.ytd-video-renderer').forEach(handleSearch);
@@ -198,6 +210,16 @@
                 display: none;
             }
         `);
+
+        // This needs to be conditionally only on the watch page, as this will break stuff like scheduled streams on the homepage
+        // I couldn't find a better selector so this will have to do
+        if (window.location.pathname.includes("/watch")) {
+            GM_addStyle(`
+                .ytContentMetadataViewModelDelimiter {
+                    margin: 0 0;
+                }
+            `);
+        }
     }
 
     // This is incredibly slow, but its the best I can manage with my current knowledge and without losing my mind. Please submit a PR if you know how to improve it!
