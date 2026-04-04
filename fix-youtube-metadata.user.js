@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-03-31.1
+// @version      2026-04-04.1
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -22,7 +22,7 @@
         if (includeIcon) selector += ', .yt-content-metadata-view-model__icon';
 
         meta.querySelectorAll(selector)
-            .forEach(el => el.style.display = 'none');
+            .forEach(el => { el.style.display = 'none' });
     }
 
     function createLine(text, options = {}) {
@@ -60,98 +60,126 @@
         return `${viewsText} • ${fixTime(timeEl.textContent)}`;
     }
 
-    function fixUniversal(item) {
-        const meta =
-            item.querySelector('#metadata') ||
-            item.querySelector('yt-content-metadata-view-model');
-
-        if (!meta) return;
-
-        const line = meta.querySelector('#metadata-line');
-        if (line) {
-            const spans = [...line.querySelectorAll('.inline-metadata-item, span')]
-                .filter(el => el.textContent.trim());
-
-            if (spans.length >= 2) {
-                const viewsEl = spans[0];
-                const timeEl = spans[1];
-
-                hideJunk(meta);
-
-                const formatted = formatViewsAndTime(viewsEl, timeEl);
-
-                let customLine = meta.querySelector('.spoofed-metadata-line');
-                if (!customLine) {
-                    customLine = createLine(formatted, {
-                        className: 'spoofed-metadata-line'
-                    });
-                    meta.appendChild(customLine);
-                } else if (customLine.textContent !== formatted) {
-                    customLine.textContent = formatted;
-                }
-
-                viewsEl.style.display = 'none';
-                timeEl.style.display = 'none';
-            }
-
-            return;
-        }
-
-        // yt-content-metadata-view-model (home feed etc.)
-        const texts = meta.querySelectorAll('.yt-content-metadata-view-model__metadata-text');
-        if (texts.length < 2) return;
-
-        // Livestream case (channel + watching)
-        if (texts.length === 2) {
-            const watchingEl = texts[1];
+    function handleHomepageMetadata(meta, spans) {
+        // Case A: livestream (channel name + viewers)
+        if (spans.length === 2) {
+            const watchingEl = spans[1];
             if (!watchingEl) return;
 
             hideJunk(meta, true);
 
-            let customLine = meta.querySelector('.spoofed-metadata-line');
-            if (!customLine) {
-                customLine = createLine(watchingEl.textContent, {
-                    className: 'spoofed-metadata-line'
-                });
-                meta.appendChild(customLine);
-            } else if (customLine.textContent !== watchingEl.textContent) {
-                customLine.textContent = watchingEl.textContent;
-            }
+            updateCustomLine(meta, watchingEl.textContent);
 
             watchingEl.style.display = 'none';
             return;
         }
 
-        // Normal case (channel, views, time)
-        if (texts.length >= 3) {
-            const viewsEl = texts[1];
-            const timeEl = texts[2];
+        // Case B: normal (channel name + views + time)
+        if (spans.length >= 3) {
+            const viewsEl = spans[1];
+            const timeEl = spans[2];
 
             if (!viewsEl || !timeEl) return;
 
             hideJunk(meta);
 
             const formatted = formatViewsAndTime(viewsEl, timeEl);
-
-            let customLine = meta.querySelector('.spoofed-metadata-line');
-            if (!customLine) {
-                customLine = createLine(formatted, {
-                    className: 'spoofed-metadata-line'
-                });
-                meta.appendChild(customLine);
-            } else if (customLine.textContent !== formatted) {
-                customLine.textContent = formatted;
-            }
+            updateCustomLine(meta, formatted);
 
             viewsEl.style.display = 'none';
             timeEl.style.display = 'none';
         }
     }
 
+    function handleLivestreamMetadata(meta, watchingEl) {
+        if (!watchingEl) return;
+
+        hideJunk(meta, true);
+
+        updateCustomLine(meta, watchingEl.textContent);
+
+        watchingEl.style.display = 'none';
+    }
+
+
+    function handleNormalMetadata(meta, texts) {
+        const viewsEl = texts[0];
+        const timeEl = texts[1];
+
+        if (!viewsEl || !timeEl) return;
+
+        hideJunk(meta);
+
+        const formatted = formatViewsAndTime(viewsEl, timeEl);
+        updateCustomLine(meta, formatted);
+
+        viewsEl.style.display = 'none';
+        timeEl.style.display = 'none';
+    }
+
+
+    function updateCustomLine(meta, text) {
+        let customLine = meta.querySelector('.spoofed-metadata-line');
+
+        if (!customLine) {
+            customLine = createLine(text, {
+                className: 'spoofed-metadata-line'
+            });
+            meta.appendChild(customLine);
+        } else if (customLine.textContent !== text) {
+            customLine.textContent = text;
+        }
+    }
+
+    function handleHomepage(meta) {
+        const inner = meta.querySelector(".ytContentMetadataViewModelMetadataRow");
+        if (!inner) return;
+        const homepageSpans = [...inner.querySelectorAll('span.yt-core-attributed-string')]
+        .filter(el => el.textContent.trim());
+
+        if (homepageSpans.length >= 2 && !homepageSpans[1]?.textContent?.includes('waiting')) {
+            return handleHomepageMetadata(meta, homepageSpans);
+        } else {
+            return handleLivestreamMetadata(meta, homepageSpans[1]);
+        }
+    }
+
+    function handleChannel(meta) {
+        const inner = meta.querySelector('#metadata-line');
+        if (!inner) return;
+        const channelSpans = [...inner.querySelectorAll('span.ytd-grid-video-renderer, span.inline-metadata-item')]
+        .filter(el => el.textContent.trim());
+
+        // This looks redundant, i think its already covered
+        // if (channelSpans.length === 2) {
+        //     return handleLivestreamMetadata(inner, channelSpans[1]);
+        // }
+
+        if (channelSpans.length === 2) {
+            return handleNormalMetadata(inner, channelSpans);
+        }
+    }
+
+    function handleSearch(meta) {
+        const inner = meta.querySelector('#metadata-line');
+        if (!inner) return;
+        const searchSpans = [...inner.querySelectorAll('span.inline-metadata-item')]
+        .filter(el => el.textContent.trim());
+        if (searchSpans.length === 2) {
+            return handleNormalMetadata(inner, searchSpans);
+        }
+
+        if (searchSpans.length === 1) {
+            return handleLivestreamMetadata(inner, searchSpans[0]);
+        }
+    }
+
     function scan() {
-        document.querySelectorAll(
-            'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-rich-grid-media'
-        ).forEach(fixUniversal);
+        // The element selected here determines where the spoofed line gets added by updateCustomLine(). This is for the homepage only because jank
+        document.querySelectorAll('.yt-lockup-metadata-view-model__metadata').forEach(handleHomepage);
+        // ytd-grid-video-renderer is for the channel homepage, ytd-video-meta-block is for the channel videos page, yeah idfk why it's different either
+        document.querySelectorAll('ytd-grid-video-renderer, ytd-video-meta-block').forEach(handleChannel);
+        document.querySelectorAll('ytd-video-meta-block.style-scope.ytd-video-renderer').forEach(handleSearch);
     }
 
     function injectStyles() {
@@ -165,9 +193,14 @@
                 color: #aaa;
                 margin-top: 2px;
             }
+
+            .ytContentMetadataViewModelLeadingIcon {
+                display: none;
+            }
         `);
     }
 
+    // This is incredibly slow, but its the best I can manage with my current knowledge and without losing my mind. Please submit a PR if you know how to improve it!
     const observer = new MutationObserver(scan);
     observer.observe(document.body, { childList: true, subtree: true });
 
