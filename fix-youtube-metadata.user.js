@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-04-04.2
+// @version      2026-04-08.1
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -188,7 +188,7 @@
     function scan() {
         // The element selected here determines where the spoofed line gets added by updateCustomLine(). This is for the homepage only because jank
         // This selector applies to both the homepage and the recommendations on the right side of videos
-        document.querySelectorAll('.yt-lockup-metadata-view-model__metadata').forEach(handleRecommendations);
+        document.querySelectorAll('.ytLockupMetadataViewModelMetadata').forEach(handleRecommendations);
         // ytd-grid-video-renderer is for the channel homepage, ytd-video-meta-block is for the channel videos page, yeah idfk why it's different either
         document.querySelectorAll('ytd-grid-video-renderer, ytd-video-meta-block').forEach(handleChannel);
         document.querySelectorAll('ytd-video-meta-block.style-scope.ytd-video-renderer').forEach(handleSearch);
