@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-04-08.1
+// @version      2026-04-10.1
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -144,12 +144,12 @@
         } else {
             inner = rowContainers[0]
         }
-        const homepageSpans = [...inner.querySelectorAll('span.yt-core-attributed-string')]
+        const homepageSpans = [...inner.querySelectorAll('span.ytAttributedStringHost')]
         .filter(el => el.textContent.trim());
 
         if (isSidenavVideos) {
             // Fix the font sizing of the channel name, could probably move this to GM_addStyle later
-            rowContainers[0].querySelectorAll('span.yt-core-attributed-string')[0].style.fontSize = "14px";
+            rowContainers[0].querySelectorAll('span.ytAttributedStringHost')[0].style.fontSize = "14px";
             return handleNormalMetadata(inner, homepageSpans);
         }
 
