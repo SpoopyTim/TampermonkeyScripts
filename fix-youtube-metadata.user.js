@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Original Video Metadata (Layout Fixed)
 // @namespace    http://tampermonkey.net/
-// @version      2026-04-10.1
+// @version      2026-04-28.1
 // @license      MIT
 // @description  Restore original YouTube metadata layout (proper spacing + size)
 // @author       SpoopyTim
@@ -161,9 +161,9 @@
     }
 
     function handleChannel(meta) {
-        const inner = meta.querySelector('#metadata-line');
+        const inner = meta.querySelector('yt-content-metadata-view-model');
         if (!inner) return;
-        const channelSpans = [...inner.querySelectorAll('span.ytd-grid-video-renderer, span.inline-metadata-item')]
+        const channelSpans = [...inner.querySelectorAll('span.ytd-grid-video-renderer, span.ytAttributedStringHost')]
         .filter(el => el.textContent.trim());
 
         if (channelSpans.length === 2) {
@@ -186,12 +186,19 @@
     }
 
     function scan() {
-        // The element selected here determines where the spoofed line gets added by updateCustomLine(). This is for the homepage only because jank
-        // This selector applies to both the homepage and the recommendations on the right side of videos
-        document.querySelectorAll('.ytLockupMetadataViewModelMetadata').forEach(handleRecommendations);
-        // ytd-grid-video-renderer is for the channel homepage, ytd-video-meta-block is for the channel videos page, yeah idfk why it's different either
-        document.querySelectorAll('ytd-grid-video-renderer, ytd-video-meta-block').forEach(handleChannel);
-        document.querySelectorAll('ytd-video-meta-block.style-scope.ytd-video-renderer').forEach(handleSearch);
+        const patterns = {
+            recommendation: /$/,
+            channel: /^\/@([^/]+)(?:\/(.*))?$/
+        }
+        if (patterns.channel.test(window.location.pathname)) {
+            document.querySelectorAll('.ytLockupMetadataViewModelMetadata').forEach(handleChannel);
+        } else {
+            // The element selected here determines where the spoofed line gets added by updateCustomLine(). This is for the homepage only because jank
+            // This selector applies to both the homepage and the recommendations on the right side of videos
+            document.querySelectorAll('.ytLockupMetadataViewModelMetadata').forEach(handleRecommendations);
+            // ytd-grid-video-renderer is for the channel homepage, ytd-video-meta-block is for the channel videos page, yeah idfk why it's different either
+            document.querySelectorAll('ytd-video-meta-block.style-scope.ytd-video-renderer').forEach(handleSearch);
+        }
     }
 
     function injectStyles() {
